@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, NamedTuple
 
 from synapse_ai.ingestion.filters import (
     DEFAULT_SOURCE_EXTENSIONS,
@@ -8,7 +9,18 @@ from synapse_ai.ingestion.filters import (
     is_source_file,
     should_skip_directory,
 )
+from synapse_ai.ingestion.resolver import deduplicate_files, resolve_file
 from synapse_ai.models.file_model import FileModel
+
+
+class ResolvedTraverseResult(NamedTuple):
+    """Output of :func:`traverse_repository_with_resolution`."""
+
+    source_files: list[FileModel]
+    total_scanned: int
+    resolved_files: list[dict[str, Any]]
+    unique_files: list[dict[str, Any]]
+    duplicate_files: list[dict[str, Any]]
 
 
 def traverse_repository(
@@ -90,3 +102,38 @@ def traverse_repository(
                 return source_files, total_files_scanned
 
     return source_files, total_files_scanned
+
+
+def traverse_repository_with_resolution(
+    repo_root: Path,
+    max_files: int | None = None,
+    extensions: set[str] | None = None,
+) -> ResolvedTraverseResult:
+    """
+    Run :func:`traverse_repository`, then Layer 1 :func:`resolve_file` on each
+    entry, then :func:`deduplicate_files` by ``(device, inode)``.
+
+    Connects repository root (from :func:`~synapse_ai.ingestion.repo_loader.load_repository`)
+    to filesystem metadata + physical uniqueness for the manifest.
+
+    ``resolved_files`` is ordered like ``source_files`` (full list before dedupe).
+    ``unique_files`` / ``duplicate_files`` partition by shared ``identity``.
+    """
+    source_files, total_scanned = traverse_repository(
+        repo_root, max_files=max_files, extensions=extensions
+    )
+    root = repo_root.expanduser().resolve(strict=False)
+
+    resolved_files: list[dict[str, Any]] = []
+    for f in source_files:
+        path = root / f.relative_path
+        resolved_files.append(resolve_file(path, root))
+
+    unique_files, duplicate_files = deduplicate_files(resolved_files)
+    return ResolvedTraverseResult(
+        source_files=source_files,
+        total_scanned=total_scanned,
+        resolved_files=resolved_files,
+        unique_files=unique_files,
+        duplicate_files=duplicate_files,
+    )
