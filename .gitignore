@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# OS files
+.DS_Store
+
+# Project outputs / generated artifacts
+output/
+parsed_single.json
+parsed_files.json
+parsed_files_smoke.json
+parsed_files_smoke*.json
+parsed_*.json
+repo_manifest.json
+resolved_dependencies.json
+dependency_graph.json
+
+# Local scratch repos for smoke tests
+test_repo/
